@@ -252,14 +252,15 @@ jobs:
             mingw-w64-clang-aarch64-gmp
       - name: Build
         run: |
+          export CONFIG_SHELL=/usr/bin/bash
           autoreconf -i
-          ./configure \
+          /usr/bin/bash ./configure \
             --host=aarch64-w64-mingw32 \
             --without-openssl --without-gnutls --with-wintls \
             --without-libxml2 --with-libexpat \
             --with-libcares --with-libz --with-sqlite3 --with-libssh2 \
             --with-libgmp --without-libgcrypt --without-libnettle \
-            --disable-nls \
+            --disable-nls --disable-websocket \
             ARIA2_STATIC=yes \
             CXXFLAGS="-O2" CFLAGS="-O2"
           make -j"$(nproc)"
