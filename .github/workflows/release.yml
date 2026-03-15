@@ -171,110 +171,245 @@ jobs:
           path: aria2-*-macos-x86_64.tar.bz2
 
   # ---------------------------------------------------------------------------
-  # Windows x86_64
+  # Windows x86_64 (cross-compiled on Ubuntu, following Dockerfile.mingw)
   # ---------------------------------------------------------------------------
   build-windows-x64:
     name: Windows x86_64
-    runs-on: windows-2025
-    defaults:
-      run:
-        shell: msys2 {0}
+    runs-on: ubuntu-24.04
+    env:
+      HOST: x86_64-w64-mingw32
+      PREFIX: /usr/local/x86_64-w64-mingw32
     steps:
       - uses: actions/checkout@v4
-      - uses: msys2/setup-msys2@v2
-        with:
-          msystem: MINGW64
-          update: true
-          install: >-
-            base-devel
-            autoconf automake libtool pkg-config gettext-devel
-            mingw-w64-x86_64-gcc
-            mingw-w64-x86_64-c-ares
-            mingw-w64-x86_64-sqlite3
-            mingw-w64-x86_64-libssh2
-            mingw-w64-x86_64-expat
-            mingw-w64-x86_64-zlib
-            mingw-w64-x86_64-gmp
-      - name: Build
+
+      - name: Install cross-compilation toolchain
         run: |
-          export CONFIG_SHELL=/usr/bin/bash
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            make binutils autoconf automake autotools-dev autopoint libtool \
+            patch ca-certificates pkg-config curl dpkg-dev lzip gettext \
+            gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64
+
+      - name: Download dependencies
+        run: |
+          curl -L -O https://gmplib.org/download/gmp/gmp-6.3.0.tar.xz
+          curl -L -O https://github.com/libexpat/libexpat/releases/download/R_2_5_0/expat-2.5.0.tar.bz2
+          curl -L -O https://www.sqlite.org/2023/sqlite-autoconf-3430100.tar.gz
+          curl -L -O https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.gz
+          curl -L -O https://github.com/c-ares/c-ares/releases/download/cares-1_19_1/c-ares-1.19.1.tar.gz
+          curl -L -O https://libssh2.org/download/libssh2-1.11.0.tar.bz2
+
+      - name: Build gmp
+        run: |
+          tar xf gmp-6.3.0.tar.xz && cd gmp-6.3.0
+          ./configure \
+            --disable-shared --enable-static \
+            --prefix=$PREFIX --host=$HOST \
+            --disable-cxx --enable-fat \
+            CFLAGS="-mtune=generic -O2 -g0"
+          make -j$(nproc) install
+
+      - name: Build expat
+        run: |
+          tar xf expat-2.5.0.tar.bz2 && cd expat-2.5.0
+          ./configure \
+            --disable-shared --enable-static \
+            --prefix=$PREFIX --host=$HOST \
+            --build=$(dpkg-architecture -qDEB_BUILD_GNU_TYPE)
+          make -j$(nproc) install
+
+      - name: Build sqlite3
+        run: |
+          tar xf sqlite-autoconf-3430100.tar.gz && cd sqlite-autoconf-3430100
+          ./configure \
+            --disable-shared --enable-static \
+            --prefix=$PREFIX --host=$HOST \
+            --build=$(dpkg-architecture -qDEB_BUILD_GNU_TYPE)
+          make -j$(nproc) install
+
+      - name: Build zlib
+        run: |
+          tar xf zlib-1.3.1.tar.gz && cd zlib-1.3.1
+          CC=$HOST-gcc AR=$HOST-ar LD=$HOST-ld \
+          RANLIB=$HOST-ranlib STRIP=$HOST-strip \
+          ./configure \
+            --prefix=$PREFIX \
+            --libdir=$PREFIX/lib \
+            --includedir=$PREFIX/include \
+            --static
+          make -j$(nproc) install
+
+      - name: Build c-ares
+        run: |
+          tar xf c-ares-1.19.1.tar.gz && cd c-ares-1.19.1
+          ./configure \
+            --disable-shared --enable-static --without-random \
+            --prefix=$PREFIX --host=$HOST \
+            --build=$(dpkg-architecture -qDEB_BUILD_GNU_TYPE) \
+            LIBS="-lws2_32"
+          make -j$(nproc) install
+
+      - name: Build libssh2
+        run: |
+          tar xf libssh2-1.11.0.tar.bz2 && cd libssh2-1.11.0
+          ./configure \
+            --disable-shared --enable-static \
+            --prefix=$PREFIX --host=$HOST \
+            --build=$(dpkg-architecture -qDEB_BUILD_GNU_TYPE) \
+            LIBS="-lws2_32"
+          make -j$(nproc) install
+
+      - name: Build aria2
+        run: |
           autoreconf -i
-          /usr/bin/bash ./configure \
-            --host=x86_64-w64-mingw32 \
-            --without-openssl --without-gnutls --with-wintls \
-            --without-libxml2 --with-libexpat \
-            --with-libcares --with-libz --with-sqlite3 --with-libssh2 \
-            --with-libgmp --without-libgcrypt --without-libnettle \
-            --disable-nls --disable-websocket \
+          ./configure \
+            --host=$HOST --prefix=$PREFIX \
+            --without-included-gettext --disable-nls \
+            --with-libcares --without-gnutls --without-openssl \
+            --with-sqlite3 --without-libxml2 --with-libexpat \
+            --with-libz --with-libgmp --with-libssh2 \
+            --without-libgcrypt --without-libnettle \
             ARIA2_STATIC=yes \
-            CXXFLAGS="-O2" CFLAGS="-O2"
-          make -j"$(nproc)"
-          strip src/aria2c.exe
+            CPPFLAGS="-I$PREFIX/include" \
+            LDFLAGS="-L$PREFIX/lib" \
+            PKG_CONFIG="/usr/bin/pkg-config" \
+            PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig"
+          make -j$(nproc)
+          $HOST-strip src/aria2c.exe
+
       - name: Package
-        shell: pwsh
         run: |
-          $version = "$env:GITHUB_REF_NAME" -replace '^v', ''
-          $dirname = "aria2-${version}-windows-x86_64"
-          New-Item -ItemType Directory -Force -Path $dirname
-          Copy-Item src/aria2c.exe $dirname/
-          Copy-Item COPYING $dirname/
-          Copy-Item README.rst $dirname/
-          Compress-Archive -Path $dirname -DestinationPath "${dirname}.zip"
+          VERSION="${GITHUB_REF_NAME#v}"
+          DIRNAME="aria2-${VERSION}-windows-x86_64"
+          mkdir -p "${DIRNAME}"
+          cp src/aria2c.exe "${DIRNAME}/"
+          cp COPYING README.rst "${DIRNAME}/"
+          zip -r "${DIRNAME}.zip" "${DIRNAME}"
+
       - uses: actions/upload-artifact@v4
         with:
           name: windows-x86_64
           path: aria2-*-windows-x86_64.zip
 
   # ---------------------------------------------------------------------------
-  # Windows ARM64
+  # Windows ARM64 (cross-compiled on Ubuntu with llvm-mingw)
   # ---------------------------------------------------------------------------
   build-windows-arm64:
     name: Windows ARM64
-    runs-on: windows-11-arm
-    defaults:
-      run:
-        shell: msys2 {0}
+    runs-on: ubuntu-24.04
+    env:
+      HOST: aarch64-w64-mingw32
+      PREFIX: /usr/local/aarch64-w64-mingw32
+      LLVM_MINGW_VER: "20250114"
     steps:
       - uses: actions/checkout@v4
-      - uses: msys2/setup-msys2@v2
-        with:
-          msystem: CLANGARM64
-          update: true
-          install: >-
-            base-devel
-            autoconf automake libtool pkg-config gettext-devel
-            mingw-w64-clang-aarch64-clang
-            mingw-w64-clang-aarch64-c-ares
-            mingw-w64-clang-aarch64-sqlite3
-            mingw-w64-clang-aarch64-libssh2
-            mingw-w64-clang-aarch64-expat
-            mingw-w64-clang-aarch64-zlib
-            mingw-w64-clang-aarch64-gmp
-      - name: Build
+
+      - name: Install llvm-mingw toolchain
         run: |
-          export CONFIG_SHELL=/usr/bin/bash
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            make binutils autoconf automake autotools-dev autopoint libtool \
+            patch ca-certificates pkg-config curl dpkg-dev lzip gettext
+          curl -L -O https://github.com/mstorsjo/llvm-mingw/releases/download/$LLVM_MINGW_VER/llvm-mingw-$LLVM_MINGW_VER-ucrt-ubuntu-20.04-x86_64.tar.xz
+          tar xf llvm-mingw-$LLVM_MINGW_VER-ucrt-ubuntu-20.04-x86_64.tar.xz
+          echo "$PWD/llvm-mingw-$LLVM_MINGW_VER-ucrt-ubuntu-20.04-x86_64/bin" >> $GITHUB_PATH
+
+      - name: Download dependencies
+        run: |
+          curl -L -O https://gmplib.org/download/gmp/gmp-6.3.0.tar.xz
+          curl -L -O https://github.com/libexpat/libexpat/releases/download/R_2_5_0/expat-2.5.0.tar.bz2
+          curl -L -O https://www.sqlite.org/2023/sqlite-autoconf-3430100.tar.gz
+          curl -L -O https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.gz
+          curl -L -O https://github.com/c-ares/c-ares/releases/download/cares-1_19_1/c-ares-1.19.1.tar.gz
+          curl -L -O https://libssh2.org/download/libssh2-1.11.0.tar.bz2
+
+      - name: Build gmp
+        run: |
+          tar xf gmp-6.3.0.tar.xz && cd gmp-6.3.0
+          ./configure \
+            --disable-shared --enable-static \
+            --prefix=$PREFIX --host=$HOST \
+            --disable-cxx --disable-assembly \
+            CFLAGS="-O2 -g0"
+          make -j$(nproc) install
+
+      - name: Build expat
+        run: |
+          tar xf expat-2.5.0.tar.bz2 && cd expat-2.5.0
+          ./configure \
+            --disable-shared --enable-static \
+            --prefix=$PREFIX --host=$HOST \
+            --build=$(dpkg-architecture -qDEB_BUILD_GNU_TYPE)
+          make -j$(nproc) install
+
+      - name: Build sqlite3
+        run: |
+          tar xf sqlite-autoconf-3430100.tar.gz && cd sqlite-autoconf-3430100
+          ./configure \
+            --disable-shared --enable-static \
+            --prefix=$PREFIX --host=$HOST \
+            --build=$(dpkg-architecture -qDEB_BUILD_GNU_TYPE)
+          make -j$(nproc) install
+
+      - name: Build zlib
+        run: |
+          tar xf zlib-1.3.1.tar.gz && cd zlib-1.3.1
+          CC=$HOST-gcc AR=$HOST-ar LD=$HOST-ld \
+          RANLIB=$HOST-ranlib STRIP=$HOST-strip \
+          ./configure \
+            --prefix=$PREFIX \
+            --libdir=$PREFIX/lib \
+            --includedir=$PREFIX/include \
+            --static
+          make -j$(nproc) install
+
+      - name: Build c-ares
+        run: |
+          tar xf c-ares-1.19.1.tar.gz && cd c-ares-1.19.1
+          ./configure \
+            --disable-shared --enable-static --without-random \
+            --prefix=$PREFIX --host=$HOST \
+            --build=$(dpkg-architecture -qDEB_BUILD_GNU_TYPE) \
+            LIBS="-lws2_32"
+          make -j$(nproc) install
+
+      - name: Build libssh2
+        run: |
+          tar xf libssh2-1.11.0.tar.bz2 && cd libssh2-1.11.0
+          ./configure \
+            --disable-shared --enable-static \
+            --prefix=$PREFIX --host=$HOST \
+            --build=$(dpkg-architecture -qDEB_BUILD_GNU_TYPE) \
+            LIBS="-lws2_32"
+          make -j$(nproc) install
+
+      - name: Build aria2
+        run: |
           autoreconf -i
-          /usr/bin/bash ./configure \
-            --host=aarch64-w64-mingw32 \
-            --without-openssl --without-gnutls --with-wintls \
-            --without-libxml2 --with-libexpat \
-            --with-libcares --with-libz --with-sqlite3 --with-libssh2 \
-            --with-libgmp --without-libgcrypt --without-libnettle \
-            --disable-nls --disable-websocket \
+          ./configure \
+            --host=$HOST --prefix=$PREFIX \
+            --without-included-gettext --disable-nls \
+            --with-libcares --without-gnutls --without-openssl \
+            --with-sqlite3 --without-libxml2 --with-libexpat \
+            --with-libz --with-libgmp --with-libssh2 \
+            --without-libgcrypt --without-libnettle \
             ARIA2_STATIC=yes \
-            CXXFLAGS="-O2" CFLAGS="-O2"
-          make -j"$(nproc)"
-          strip src/aria2c.exe
+            CPPFLAGS="-I$PREFIX/include" \
+            LDFLAGS="-L$PREFIX/lib" \
+            PKG_CONFIG="/usr/bin/pkg-config" \
+            PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig"
+          make -j$(nproc)
+          $HOST-strip src/aria2c.exe
+
       - name: Package
-        shell: pwsh
         run: |
-          $version = "$env:GITHUB_REF_NAME" -replace '^v', ''
-          $dirname = "aria2-${version}-windows-arm64"
-          New-Item -ItemType Directory -Force -Path $dirname
-          Copy-Item src/aria2c.exe $dirname/
-          Copy-Item COPYING $dirname/
-          Copy-Item README.rst $dirname/
-          Compress-Archive -Path $dirname -DestinationPath "${dirname}.zip"
+          VERSION="${GITHUB_REF_NAME#v}"
+          DIRNAME="aria2-${VERSION}-windows-arm64"
+          mkdir -p "${DIRNAME}"
+          cp src/aria2c.exe "${DIRNAME}/"
+          cp COPYING README.rst "${DIRNAME}/"
+          zip -r "${DIRNAME}.zip" "${DIRNAME}"
+
       - uses: actions/upload-artifact@v4
         with:
           name: windows-arm64
