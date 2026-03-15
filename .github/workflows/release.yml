@@ -207,7 +207,7 @@ jobs:
             --prefix=$PREFIX --host=$HOST \
             --disable-cxx --enable-fat \
             CFLAGS="-mtune=generic -O2 -g0"
-          make -j$(nproc) install
+          sudo make -j$(nproc) install
 
       - name: Build expat
         run: |
@@ -216,7 +216,7 @@ jobs:
             --disable-shared --enable-static \
             --prefix=$PREFIX --host=$HOST \
             --build=$(dpkg-architecture -qDEB_BUILD_GNU_TYPE)
-          make -j$(nproc) install
+          sudo make -j$(nproc) install
 
       - name: Build sqlite3
         run: |
@@ -225,7 +225,7 @@ jobs:
             --disable-shared --enable-static \
             --prefix=$PREFIX --host=$HOST \
             --build=$(dpkg-architecture -qDEB_BUILD_GNU_TYPE)
-          make -j$(nproc) install
+          sudo make -j$(nproc) install
 
       - name: Build zlib
         run: |
@@ -237,7 +237,7 @@ jobs:
             --libdir=$PREFIX/lib \
             --includedir=$PREFIX/include \
             --static
-          make -j$(nproc) install
+          sudo make -j$(nproc) install
 
       - name: Build c-ares
         run: |
@@ -247,7 +247,7 @@ jobs:
             --prefix=$PREFIX --host=$HOST \
             --build=$(dpkg-architecture -qDEB_BUILD_GNU_TYPE) \
             LIBS="-lws2_32"
-          make -j$(nproc) install
+          sudo make -j$(nproc) install
 
       - name: Build libssh2
         run: |
@@ -257,7 +257,7 @@ jobs:
             --prefix=$PREFIX --host=$HOST \
             --build=$(dpkg-architecture -qDEB_BUILD_GNU_TYPE) \
             LIBS="-lws2_32"
-          make -j$(nproc) install
+          sudo make -j$(nproc) install
 
       - name: Build aria2
         run: |
@@ -331,7 +331,7 @@ jobs:
             --prefix=$PREFIX --host=$HOST \
             --disable-cxx --disable-assembly \
             CFLAGS="-O2 -g0"
-          make -j$(nproc) install
+          sudo make -j$(nproc) install
 
       - name: Build expat
         run: |
@@ -340,7 +340,7 @@ jobs:
             --disable-shared --enable-static \
             --prefix=$PREFIX --host=$HOST \
             --build=$(dpkg-architecture -qDEB_BUILD_GNU_TYPE)
-          make -j$(nproc) install
+          sudo make -j$(nproc) install
 
       - name: Build sqlite3
         run: |
@@ -349,7 +349,7 @@ jobs:
             --disable-shared --enable-static \
             --prefix=$PREFIX --host=$HOST \
             --build=$(dpkg-architecture -qDEB_BUILD_GNU_TYPE)
-          make -j$(nproc) install
+          sudo make -j$(nproc) install
 
       - name: Build zlib
         run: |
@@ -361,7 +361,7 @@ jobs:
             --libdir=$PREFIX/lib \
             --includedir=$PREFIX/include \
             --static
-          make -j$(nproc) install
+          sudo make -j$(nproc) install
 
       - name: Build c-ares
         run: |
@@ -371,7 +371,7 @@ jobs:
             --prefix=$PREFIX --host=$HOST \
             --build=$(dpkg-architecture -qDEB_BUILD_GNU_TYPE) \
             LIBS="-lws2_32"
-          make -j$(nproc) install
+          sudo make -j$(nproc) install
 
       - name: Build libssh2
         run: |
@@ -381,7 +381,7 @@ jobs:
             --prefix=$PREFIX --host=$HOST \
             --build=$(dpkg-architecture -qDEB_BUILD_GNU_TYPE) \
             LIBS="-lws2_32"
-          make -j$(nproc) install
+          sudo make -j$(nproc) install
 
       - name: Build aria2
         run: |
