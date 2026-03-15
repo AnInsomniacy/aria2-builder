@@ -1,0 +1,319 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+env:
+  ARIA2_STATIC: "yes"
+
+concurrency:
+  group: "${{ github.workflow }}-${{ github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Linux x86_64
+  # ---------------------------------------------------------------------------
+  build-linux-x64:
+    name: Linux x86_64
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            autoconf automake autotools-dev autopoint libtool pkg-config \
+            libssl-dev libc-ares-dev zlib1g-dev libsqlite3-dev \
+            libssh2-1-dev libexpat1-dev
+      - name: Build
+        run: |
+          autoreconf -i
+          ./configure \
+            --without-gnutls --with-openssl \
+            --without-libxml2 --with-libexpat \
+            --with-libcares --with-libz --with-sqlite3 --with-libssh2 \
+            --disable-nls \
+            CXXFLAGS="-O2" CFLAGS="-O2" \
+            LDFLAGS="-static-libstdc++"
+          make -j"$(nproc)"
+          strip src/aria2c
+      - name: Package
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          DIRNAME="aria2-${VERSION}-linux-x86_64"
+          mkdir -p "${DIRNAME}"
+          cp src/aria2c "${DIRNAME}/"
+          cp COPYING README.md "${DIRNAME}/"
+          cp doc/bash_completion/aria2c "${DIRNAME}/aria2c.bash_completion" || true
+          tar cJf "${DIRNAME}.tar.xz" "${DIRNAME}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-x86_64
+          path: aria2-*-linux-x86_64.tar.xz
+
+  # ---------------------------------------------------------------------------
+  # Linux ARM64
+  # ---------------------------------------------------------------------------
+  build-linux-arm64:
+    name: Linux ARM64
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            autoconf automake autotools-dev autopoint libtool pkg-config \
+            libssl-dev libc-ares-dev zlib1g-dev libsqlite3-dev \
+            libssh2-1-dev libexpat1-dev
+      - name: Build
+        run: |
+          autoreconf -i
+          ./configure \
+            --without-gnutls --with-openssl \
+            --without-libxml2 --with-libexpat \
+            --with-libcares --with-libz --with-sqlite3 --with-libssh2 \
+            --disable-nls \
+            CXXFLAGS="-O2" CFLAGS="-O2" \
+            LDFLAGS="-static-libstdc++"
+          make -j"$(nproc)"
+          strip src/aria2c
+      - name: Package
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          DIRNAME="aria2-${VERSION}-linux-aarch64"
+          mkdir -p "${DIRNAME}"
+          cp src/aria2c "${DIRNAME}/"
+          cp COPYING README.md "${DIRNAME}/"
+          cp doc/bash_completion/aria2c "${DIRNAME}/aria2c.bash_completion" || true
+          tar cJf "${DIRNAME}.tar.xz" "${DIRNAME}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-aarch64
+          path: aria2-*-linux-aarch64.tar.xz
+
+  # ---------------------------------------------------------------------------
+  # macOS ARM64 (Apple Silicon)
+  # ---------------------------------------------------------------------------
+  build-macos-arm64:
+    name: macOS ARM64
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          brew install autoconf automake libtool pkg-config \
+            c-ares libssh2 sqlite3 openssl
+      - name: Build
+        run: |
+          autoreconf -i
+          ./configure \
+            --without-openssl --without-gnutls --with-appletls \
+            --without-libxml2 --with-libexpat \
+            --with-libcares --with-libz --with-sqlite3 --with-libssh2 \
+            --disable-nls \
+            CXXFLAGS="-O2" CFLAGS="-O2"
+          make -j"$(sysctl -n hw.ncpu)"
+          strip src/aria2c
+      - name: Package
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          DIRNAME="aria2-${VERSION}-macos-arm64"
+          mkdir -p "${DIRNAME}"
+          cp src/aria2c "${DIRNAME}/"
+          cp COPYING README.md "${DIRNAME}/"
+          tar cjf "${DIRNAME}.tar.bz2" "${DIRNAME}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-arm64
+          path: aria2-*-macos-arm64.tar.bz2
+
+  # ---------------------------------------------------------------------------
+  # macOS Intel (x86_64)
+  # ---------------------------------------------------------------------------
+  build-macos-intel:
+    name: macOS Intel
+    runs-on: macos-15-intel
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          brew install autoconf automake libtool pkg-config \
+            c-ares libssh2 sqlite3 openssl
+      - name: Build
+        run: |
+          autoreconf -i
+          ./configure \
+            --without-openssl --without-gnutls --with-appletls \
+            --without-libxml2 --with-libexpat \
+            --with-libcares --with-libz --with-sqlite3 --with-libssh2 \
+            --disable-nls \
+            CXXFLAGS="-O2" CFLAGS="-O2"
+          make -j"$(sysctl -n hw.ncpu)"
+          strip src/aria2c
+      - name: Package
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          DIRNAME="aria2-${VERSION}-macos-x86_64"
+          mkdir -p "${DIRNAME}"
+          cp src/aria2c "${DIRNAME}/"
+          cp COPYING README.md "${DIRNAME}/"
+          tar cjf "${DIRNAME}.tar.bz2" "${DIRNAME}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-x86_64
+          path: aria2-*-macos-x86_64.tar.bz2
+
+  # ---------------------------------------------------------------------------
+  # Windows x86_64
+  # ---------------------------------------------------------------------------
+  build-windows-x64:
+    name: Windows x86_64
+    runs-on: windows-2025
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            base-devel
+            autoconf automake libtool pkg-config
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-c-ares
+            mingw-w64-x86_64-sqlite3
+            mingw-w64-x86_64-libssh2
+            mingw-w64-x86_64-expat
+            mingw-w64-x86_64-zlib
+            mingw-w64-x86_64-gmp
+      - name: Build
+        run: |
+          autoreconf -i
+          ./configure \
+            --host=x86_64-w64-mingw32 \
+            --without-openssl --without-gnutls --with-wintls \
+            --without-libxml2 --with-libexpat \
+            --with-libcares --with-libz --with-sqlite3 --with-libssh2 \
+            --with-libgmp --without-libgcrypt --without-libnettle \
+            --disable-nls \
+            ARIA2_STATIC=yes \
+            CXXFLAGS="-O2" CFLAGS="-O2"
+          make -j"$(nproc)"
+          strip src/aria2c.exe
+      - name: Package
+        shell: pwsh
+        run: |
+          $version = "$env:GITHUB_REF_NAME" -replace '^v', ''
+          $dirname = "aria2-${version}-windows-x86_64"
+          New-Item -ItemType Directory -Force -Path $dirname
+          Copy-Item src/aria2c.exe $dirname/
+          Copy-Item COPYING $dirname/
+          Copy-Item README.md $dirname/
+          Compress-Archive -Path $dirname -DestinationPath "${dirname}.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-x86_64
+          path: aria2-*-windows-x86_64.zip
+
+  # ---------------------------------------------------------------------------
+  # Windows ARM64
+  # ---------------------------------------------------------------------------
+  build-windows-arm64:
+    name: Windows ARM64
+    runs-on: windows-11-arm
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: CLANGARM64
+          update: true
+          install: >-
+            base-devel
+            autoconf automake libtool pkg-config
+            mingw-w64-clang-aarch64-clang
+            mingw-w64-clang-aarch64-c-ares
+            mingw-w64-clang-aarch64-sqlite3
+            mingw-w64-clang-aarch64-libssh2
+            mingw-w64-clang-aarch64-expat
+            mingw-w64-clang-aarch64-zlib
+            mingw-w64-clang-aarch64-gmp
+      - name: Build
+        run: |
+          autoreconf -i
+          ./configure \
+            --host=aarch64-w64-mingw32 \
+            --without-openssl --without-gnutls --with-wintls \
+            --without-libxml2 --with-libexpat \
+            --with-libcares --with-libz --with-sqlite3 --with-libssh2 \
+            --with-libgmp --without-libgcrypt --without-libnettle \
+            --disable-nls \
+            ARIA2_STATIC=yes \
+            CXXFLAGS="-O2" CFLAGS="-O2"
+          make -j"$(nproc)"
+          strip src/aria2c.exe
+      - name: Package
+        shell: pwsh
+        run: |
+          $version = "$env:GITHUB_REF_NAME" -replace '^v', ''
+          $dirname = "aria2-${version}-windows-arm64"
+          New-Item -ItemType Directory -Force -Path $dirname
+          Copy-Item src/aria2c.exe $dirname/
+          Copy-Item COPYING $dirname/
+          Copy-Item README.md $dirname/
+          Compress-Archive -Path $dirname -DestinationPath "${dirname}.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-arm64
+          path: aria2-*-windows-arm64.zip
+
+  # ---------------------------------------------------------------------------
+  # Create GitHub Release
+  # ---------------------------------------------------------------------------
+  release:
+    name: Create Release
+    needs:
+      - build-linux-x64
+      - build-linux-arm64
+      - build-macos-arm64
+      - build-macos-intel
+      - build-windows-x64
+      - build-windows-arm64
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Generate checksums
+        run: |
+          cd artifacts
+          sha256sum aria2-* > ../checksums.sha256
+          cd ..
+          mv checksums.sha256 "artifacts/aria2-${GITHUB_REF_NAME#v}-checksums.sha256"
+
+      - name: List release assets
+        run: ls -lhR artifacts/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          generate_release_notes: true
+          files: artifacts/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
