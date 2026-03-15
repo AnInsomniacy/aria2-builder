@@ -187,7 +187,7 @@ jobs:
           update: true
           install: >-
             base-devel
-            autoconf automake libtool pkg-config
+            autoconf automake libtool pkg-config gettext-devel
             mingw-w64-x86_64-gcc
             mingw-w64-x86_64-c-ares
             mingw-w64-x86_64-sqlite3
@@ -241,7 +241,7 @@ jobs:
           update: true
           install: >-
             base-devel
-            autoconf automake libtool pkg-config
+            autoconf automake libtool pkg-config gettext-devel
             mingw-w64-clang-aarch64-clang
             mingw-w64-clang-aarch64-c-ares
             mingw-w64-clang-aarch64-sqlite3
