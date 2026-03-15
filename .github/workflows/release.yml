@@ -9,9 +9,6 @@ on:
 permissions:
   contents: write
 
-env:
-  ARIA2_STATIC: "yes"
-
 concurrency:
   group: "${{ github.workflow }}-${{ github.ref }}"
   cancel-in-progress: true
