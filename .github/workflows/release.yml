@@ -583,7 +583,7 @@ jobs:
           tar xf libssh2-1.11.0.tar.bz2 && cd libssh2-1.11.0
           ./configure \
             --disable-shared --enable-static \
-            --disable-examples \
+            --disable-examples-build \
             --prefix=$PREFIX --host=$HOST \
             --build=$(dpkg-architecture -qDEB_BUILD_GNU_TYPE) \
             --with-crypto=openssl --with-libssl-prefix=$PREFIX \
@@ -718,7 +718,7 @@ jobs:
       - name: Build OpenSSL
         run: |
           tar xf openssl-3.4.4.tar.gz && cd openssl-3.4.4
-          ./Configure mingw64 no-shared no-module no-tests \
+          ./Configure mingw64 no-shared no-module no-tests no-asm \
             --prefix=$PREFIX --libdir=lib \
             CC=$CC AR=$AR RANLIB=$RANLIB \
             -O2
@@ -730,7 +730,7 @@ jobs:
           tar xf libssh2-1.11.0.tar.bz2 && cd libssh2-1.11.0
           ./configure \
             --disable-shared --enable-static \
-            --disable-examples \
+            --disable-examples-build \
             --prefix=$PREFIX --host=$HOST \
             --build=$(dpkg-architecture -qDEB_BUILD_GNU_TYPE) \
             --with-crypto=openssl --with-libssl-prefix=$PREFIX \
