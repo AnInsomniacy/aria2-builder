@@ -583,12 +583,13 @@ jobs:
           tar xf libssh2-1.11.0.tar.bz2 && cd libssh2-1.11.0
           ./configure \
             --disable-shared --enable-static \
+            --disable-examples \
             --prefix=$PREFIX --host=$HOST \
             --build=$(dpkg-architecture -qDEB_BUILD_GNU_TYPE) \
             --with-crypto=openssl --with-libssl-prefix=$PREFIX \
             CPPFLAGS="-I$PREFIX/include" LDFLAGS="-L$PREFIX/lib" \
             PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig" \
-            LIBS="-lws2_32"
+            LIBS="-lws2_32 -lcrypt32"
           sudo make -j$(nproc) install
 
       - name: Build aria2
@@ -605,7 +606,8 @@ jobs:
             CPPFLAGS="-I$PREFIX/include" \
             LDFLAGS="-L$PREFIX/lib" \
             PKG_CONFIG="/usr/bin/pkg-config" \
-            PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig"
+            PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig" \
+            LIBS="-lcrypt32"
           make -j$(nproc)
           $HOST-strip src/aria2c.exe
 
@@ -717,11 +719,10 @@ jobs:
         run: |
           tar xf openssl-3.4.4.tar.gz && cd openssl-3.4.4
           ./Configure mingw64 no-shared no-module no-tests \
-            --cross-compile-prefix=$HOST- \
             --prefix=$PREFIX --libdir=lib \
-            CC="$CC" \
+            CC=$CC AR=$AR RANLIB=$RANLIB \
             -O2
-          make -j$(nproc)
+          env "PATH=$PATH" make -j$(nproc)
           sudo env "PATH=$PATH" make install_sw
 
       - name: Build libssh2
@@ -729,13 +730,14 @@ jobs:
           tar xf libssh2-1.11.0.tar.bz2 && cd libssh2-1.11.0
           ./configure \
             --disable-shared --enable-static \
+            --disable-examples \
             --prefix=$PREFIX --host=$HOST \
             --build=$(dpkg-architecture -qDEB_BUILD_GNU_TYPE) \
             --with-crypto=openssl --with-libssl-prefix=$PREFIX \
             CC="$CC" \
             CPPFLAGS="-I$PREFIX/include" LDFLAGS="-L$PREFIX/lib" \
             PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig" \
-            LIBS="-lws2_32"
+            LIBS="-lws2_32 -lcrypt32"
           sudo env "PATH=$PATH" make -j$(nproc) install
 
       - name: Build aria2
@@ -753,7 +755,8 @@ jobs:
             CPPFLAGS="-I$PREFIX/include" \
             LDFLAGS="-L$PREFIX/lib" \
             PKG_CONFIG="/usr/bin/pkg-config" \
-            PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig"
+            PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig" \
+            LIBS="-lcrypt32"
           make -j$(nproc)
           $STRIP src/aria2c.exe
 
