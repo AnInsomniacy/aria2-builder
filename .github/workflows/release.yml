@@ -516,6 +516,7 @@ jobs:
           curl -L --retry 5 --connect-timeout 15 -O https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.gz
           curl -L --retry 5 --connect-timeout 15 -O https://github.com/c-ares/c-ares/releases/download/v1.34.6/c-ares-1.34.6.tar.gz
           curl -L --retry 5 --connect-timeout 15 -O https://github.com/libssh2/libssh2/releases/download/libssh2-1.11.0/libssh2-1.11.0.tar.bz2
+          curl -L --retry 5 --connect-timeout 15 -O https://github.com/openssl/openssl/releases/download/openssl-3.4.4/openssl-3.4.4.tar.gz
 
       - name: Build gmp
         run: |
@@ -567,6 +568,16 @@ jobs:
             LIBS="-lws2_32"
           sudo make -j$(nproc) install
 
+      - name: Build OpenSSL
+        run: |
+          tar xf openssl-3.4.4.tar.gz && cd openssl-3.4.4
+          ./Configure mingw64 no-shared no-module no-tests \
+            --cross-compile-prefix=$HOST- \
+            --prefix=$PREFIX --libdir=lib \
+            -O2
+          make -j$(nproc)
+          sudo make install_sw
+
       - name: Build libssh2
         run: |
           tar xf libssh2-1.11.0.tar.bz2 && cd libssh2-1.11.0
@@ -574,6 +585,9 @@ jobs:
             --disable-shared --enable-static \
             --prefix=$PREFIX --host=$HOST \
             --build=$(dpkg-architecture -qDEB_BUILD_GNU_TYPE) \
+            --with-crypto=openssl --with-libssl-prefix=$PREFIX \
+            CPPFLAGS="-I$PREFIX/include" LDFLAGS="-L$PREFIX/lib" \
+            PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig" \
             LIBS="-lws2_32"
           sudo make -j$(nproc) install
 
@@ -583,7 +597,7 @@ jobs:
           ./configure \
             --host=$HOST --prefix=$PREFIX \
             --without-included-gettext --disable-nls \
-            --with-libcares --without-gnutls --without-openssl \
+            --with-libcares --without-gnutls --with-openssl --without-wintls \
             --with-sqlite3 --without-libxml2 --with-libexpat \
             --with-libz --with-libgmp --with-libssh2 \
             --without-libgcrypt --without-libnettle \
@@ -645,6 +659,7 @@ jobs:
           curl -L --retry 5 --connect-timeout 15 -O https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.gz
           curl -L --retry 5 --connect-timeout 15 -O https://github.com/c-ares/c-ares/releases/download/v1.34.6/c-ares-1.34.6.tar.gz
           curl -L --retry 5 --connect-timeout 15 -O https://github.com/libssh2/libssh2/releases/download/libssh2-1.11.0/libssh2-1.11.0.tar.bz2
+          curl -L --retry 5 --connect-timeout 15 -O https://github.com/openssl/openssl/releases/download/openssl-3.4.4/openssl-3.4.4.tar.gz
 
       - name: Build gmp
         run: |
@@ -698,6 +713,17 @@ jobs:
             CC="$CC" LIBS="-lws2_32"
           sudo env "PATH=$PATH" make -j$(nproc) install
 
+      - name: Build OpenSSL
+        run: |
+          tar xf openssl-3.4.4.tar.gz && cd openssl-3.4.4
+          ./Configure mingw64 no-shared no-module no-tests \
+            --cross-compile-prefix=$HOST- \
+            --prefix=$PREFIX --libdir=lib \
+            CC="$CC" \
+            -O2
+          make -j$(nproc)
+          sudo env "PATH=$PATH" make install_sw
+
       - name: Build libssh2
         run: |
           tar xf libssh2-1.11.0.tar.bz2 && cd libssh2-1.11.0
@@ -705,7 +731,11 @@ jobs:
             --disable-shared --enable-static \
             --prefix=$PREFIX --host=$HOST \
             --build=$(dpkg-architecture -qDEB_BUILD_GNU_TYPE) \
-            CC="$CC" LIBS="-lws2_32"
+            --with-crypto=openssl --with-libssl-prefix=$PREFIX \
+            CC="$CC" \
+            CPPFLAGS="-I$PREFIX/include" LDFLAGS="-L$PREFIX/lib" \
+            PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig" \
+            LIBS="-lws2_32"
           sudo env "PATH=$PATH" make -j$(nproc) install
 
       - name: Build aria2
@@ -714,7 +744,7 @@ jobs:
           ./configure \
             --host=$HOST --prefix=$PREFIX \
             --without-included-gettext --disable-nls \
-            --with-libcares --without-gnutls --without-openssl \
+            --with-libcares --without-gnutls --with-openssl --without-wintls \
             --with-sqlite3 --without-libxml2 --with-libexpat \
             --with-libz --with-libgmp --with-libssh2 \
             --without-libgcrypt --without-libnettle \
